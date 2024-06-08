@@ -1,5 +1,4 @@
 ﻿# include <Siv3D.hpp>
-# include <vector>
 /*
 	よりC++ライクな書き方
 	・クラスベース
@@ -13,13 +12,15 @@ class Ball;
 class Bricks;
 class Paddle;
 
-
-enum SceneState
+/// @brief シーンの管理
+//数字を代入できないようにした
+//typedef enumは int型も代入できちゃう
+enum class SceneState
 {
+	/// @brief タイトル
 	TITLE,
+	/// @brief インゲーム
 	IN_GAME,
-	GAMEOVER,
-	CLEAR
 };
 
 //==============================
@@ -115,35 +116,41 @@ public:
 
 class BallSpawner {
 private:
-	//std::pmr::vector<Ball*> balls;
-	Ball* ballArray[5];
-	int ballArrayLenght = 5;
-	int index = 0;
+	/// @brief 複数のボールのアドレスを確保する配列
+	Ball* balls[5];
+	/// @brief ボール増減最大数
+	int ballMaxNum = 5;
+	/// @brief 現在のボール数
+	int currentBallCount = 0;
+
 public:
+	/// @brief ボール生成
 	void Generate() {
-		//balls.push_back(new Ball());
-		if (index == ballArrayLenght) return;
-		ballArray[index] = new Ball();
-		index++;
+		if (currentBallCount == ballMaxNum) return;
+		balls[currentBallCount] = new Ball();
+		currentBallCount++;
 	}
 
+	/// @brief ボール削除
 	void Delete() {
-		for (int i = 0; i < index; i++) {
-			if (ballArray[i] != nullptr)
+		for (int i = 0; i < currentBallCount; i++) {
+			if (balls[i] != nullptr)
 			{
-				delete ballArray[i];
-				ballArray[i] = nullptr;
+				delete balls[i];
+				balls[i] = nullptr;
 			}
 		}
-		index = 0;
+		currentBallCount = 0;
 	}
 
+	/// @brief ボール参照
 	Ball* GetBalls(int index) {
-		return ballArray[index];
+		return balls[index];
 	}
 
+	/// @brief 現在のボール数参照
 	int GetBallCount(){
-		return index;
+		return currentBallCount;
 	}
 };
 
@@ -248,6 +255,7 @@ private:
 	SceneState _currentScene;
 public:
 	/// @brief シーン遷移
+	/// @param state 遷移するシーンのenum
 	void SceneChange(SceneState state)
 	{
 		_currentScene = state;
@@ -322,14 +330,15 @@ void Paddle::Intersects(Ball* const target) const {
 void Main()
 {
 	Bricks bricks;
-	//Ball ball;
 	Paddle paddle;
 	BallSpawner ballSpawner;
-
 	GameManager gameManager;
+	//タイトルシーンにする
 	gameManager.SceneChange(SceneState::TITLE);
 
-	const Font font{ FontMethod::MSDF, 60};
+	const Font font{ FontMethod::MSDF, 60 };
+	const Font font30{ FontMethod::MSDF, 30 };
+
 	int32 count = 0;
 
 	while (System::Update())
@@ -338,7 +347,7 @@ void Main()
 		{
 			//タイトルシーン
 			case SceneState::TITLE:
-				font(U"Breaking blocks"_fmt(count)).drawAt(Scene::Center(),ColorF{ 0.2, 0.6, 0.9 });
+				font(U"Breaking blocks").drawAt(Scene::Center(),ColorF{ 0.2, 0.6, 0.9 });
 				if (SimpleGUI::Button(U"START", Vec2{ Scene::Center().x - 50, Scene::Center().y + 80 }, 100))
 				{
 					gameManager.SceneChange(SceneState::IN_GAME);
@@ -351,17 +360,15 @@ void Main()
 
 			//ゲームシーン
 			case SceneState::IN_GAME:
-				//==============================
+				font30(U"BallCount {} / 5"_fmt(ballSpawner.GetBallCount())).drawAt(Vec2{ 100, 400 }, ColorF{ 0.2, 0.6, 0.9 });
+
 				// 更新
-				//==============================
 				paddle.Update();
 				for (int i = 0; i < ballSpawner.GetBallCount(); i++) {
 					ballSpawner.GetBalls(i)->Update();
 				}
 
-				//==============================
 				// コリジョン
-				//==============================
 				for (int i = 0; i < ballSpawner.GetBallCount(); i++) {
 					Ball* ball = ballSpawner.GetBalls(i);
 					bricks.Intersects(ball);
@@ -370,9 +377,7 @@ void Main()
 				}
 
 
-				//==============================
 				// 描画
-				//==============================
 				bricks.Draw();
 				paddle.Draw();
 				for (int i = 0; i < ballSpawner.GetBallCount(); i++) {
