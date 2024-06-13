@@ -32,7 +32,7 @@ namespace constants {
 		constexpr Size SIZE{ 40, 20 };
 
 		/// @brief ブロックの数　縦
-		constexpr int Y_COUNT = 5;
+		constexpr int Y_COUNT = 1;
 
 		/// @brief ブロックの数　横
 		constexpr int X_COUNT = 20;
@@ -48,7 +48,7 @@ namespace constants {
 
 	namespace paddle {
 		/// @brief パドルのサイズ
-		constexpr Size SIZE{ 100, 10 };
+		constexpr Size SIZE{ 280, 10 };
 	}
 
 	namespace reflect {
@@ -116,12 +116,23 @@ public:
 
 class BallSpawner {
 private:
+	
 	/// @brief 複数のボールのアドレスを確保する配列
-	Ball* balls[5];
+	Ball* balls[3];
 	/// @brief ボール増減最大数
-	int ballMaxNum = 5;
+	int ballMaxNum = 3;
 	/// @brief 現在のボール数
 	int currentBallCount = 0;
+	/// @brief ボールを増やす時に必要な現在のブロックの数の配列
+	int bricksForExtraBall[3] = {constants::brick::MAX, constants::brick::MAX / 2, constants::brick::MAX / 4};
+	/// @brief ボールを増やす時に必要な現在のブロックの数の配列のIndex
+	int bricksForExtraBallIndex = 0;
+	/// @brief ボールのカウントダウン時の最大値
+	float BallSpawnCountMax = 3;
+	/// @brief 現在のボールのカウントダウン値
+	float BallSpawnCount = BallSpawnCountMax;
+	/// @brief ボールの生成準備を始めているかどうか
+	bool IsBallSpawnPrepare = false;
 
 public:
 	/// @brief ボール生成
@@ -129,6 +140,20 @@ public:
 		if (currentBallCount == ballMaxNum) return;
 		balls[currentBallCount] = new Ball();
 		currentBallCount++;
+		bricksForExtraBallIndex++;
+	}
+
+	/// @brief ボール生成カウントダウン
+	void BallSpawnCountDown(float DeltaTime)
+	{
+		BallSpawnCount -= DeltaTime;
+
+		if (BallSpawnCount <= 0)
+		{
+			Generate();
+			BallSpawnCount = BallSpawnCountMax;
+			IsBallSpawnPrepare = false;
+		}
 	}
 
 	/// @brief ボール削除
@@ -141,6 +166,7 @@ public:
 			}
 		}
 		currentBallCount = 0;
+		bricksForExtraBallIndex = 0;
 	}
 
 	/// @brief ボール参照
@@ -152,6 +178,41 @@ public:
 	int GetBallCount(){
 		return currentBallCount;
 	}
+
+	/// @brief 全てのボールを出したかどうか
+	/// @return 出し終わっていたらTrue
+	bool IsCurrentBallMax()
+	{
+		if (currentBallCount == ballMaxNum)
+		{
+			return true;
+		}
+		return false;
+	}
+
+	/// @brief 次ボールを増やすのに必要な壊したブロック数
+	int NextAddBallBrickCount()
+	{
+		return  bricksForExtraBall[bricksForExtraBallIndex];
+	}
+
+	/// @brief ボール生成の準備を始める
+	void BallSpawnPrepareToStart()
+	{
+		IsBallSpawnPrepare = true;
+	}
+
+	/// @brief ボール生成中もしくは準備中かどうか
+	bool GetIsBallSpawnPrepare()
+	{
+		return IsBallSpawnPrepare;
+	}
+
+	/// @brief ボール生成時のカウントの値を返す
+	float GetBallSpawnCount()
+	{
+		return BallSpawnCount;
+	}
 };
 
 /// @brief ブロック
@@ -159,6 +220,8 @@ class Bricks final {
 private:
 	/// @brief ブロックリスト
 	Rect brickTable[constants::brick::MAX];
+	/// @brief 現在あるブロック数
+	int brickCount = constants::brick::MAX;
 
 public:
 
@@ -180,6 +243,7 @@ public:
 	void Instance()
 	{
 		using namespace constants::brick;
+		brickCount = MAX;
 		for (int y = 0; y < Y_COUNT; ++y) {
 			for (int x = 0; x < X_COUNT; ++x) {
 				int index = y * X_COUNT + x;
@@ -190,6 +254,11 @@ public:
 				};
 			}
 		}
+	}
+
+	int GetCurrentBrickCount()
+	{
+		return brickCount;
 	}
 };
 
@@ -253,6 +322,8 @@ class GameManager
 private:
 	/// @brief 現在のシーン
 	SceneState _currentScene;
+	float SceneChangeTime = 3;
+	float SceneChangeTimer = 0;
 public:
 	/// @brief シーン遷移
 	/// @param state 遷移するシーンのenum
@@ -261,6 +332,21 @@ public:
 		_currentScene = state;
 	}
 
+	/// @brief シーン遷移前に少し待つ
+	/// @param DeltaTime 
+	/// @return 待ち時間が経過したらTrueを返す
+	bool WaitSceneChange(float DeltaTime)
+	{
+		SceneChangeTimer += DeltaTime;
+		if (SceneChangeTimer >= SceneChangeTime)
+		{
+			SceneChangeTimer = 0;
+			return true;
+		}
+		return false;
+	}
+
+	/// @brief 現在のシーン参照
 	SceneState GetCurrentScene()
 	{
 		return _currentScene;
@@ -301,6 +387,9 @@ void Bricks::Intersects(Ball* const target) {
 			// あたったブロックは画面外に出す
 			refBrick.y -= 600;
 
+			//ブロックの数を減らす
+			brickCount--;
+
 			// 同一フレームでは複数のブロック衝突を検知しない
 			break;
 		}
@@ -336,8 +425,10 @@ void Main()
 	//タイトルシーンにする
 	gameManager.SceneChange(SceneState::TITLE);
 
-	const Font font{ FontMethod::MSDF, 60 };
+	const Font font60{ FontMethod::MSDF, 60 };
 	const Font font30{ FontMethod::MSDF, 30 };
+	const Font font80{ FontMethod::MSDF, 80 };
+	const Font font100{ FontMethod::MSDF, 100 };
 
 	int32 count = 0;
 
@@ -345,9 +436,15 @@ void Main()
 	{
 		switch (gameManager.GetCurrentScene())
 		{
+
 			//タイトルシーン
 			case SceneState::TITLE:
-				font(U"Breaking blocks").drawAt(Scene::Center(),ColorF{ 0.2, 0.6, 0.9 });
+				//タイトル表示
+				font100(U"Breaking blocks").drawAt(Vec2{ Scene::Center().x, 200 },ColorF{ 0.2, 0.6, 0.9 });
+				//概要説明
+				font30(U"このブロック崩しは").drawAt(Vec2{ Scene::Center().x, 500 }, ColorF{ 0.2, 0.6, 0.9 });
+				font30(U"ブロックを崩すとボールが増えていきます").drawAt(Vec2{ Scene::Center().x, 550 }, ColorF{ 0.2, 0.6, 0.9 });
+				//Startボタン表示
 				if (SimpleGUI::Button(U"START", Vec2{ Scene::Center().x - 50, Scene::Center().y + 80 }, 100))
 				{
 					gameManager.SceneChange(SceneState::IN_GAME);
@@ -358,9 +455,9 @@ void Main()
 				}
 				break;
 
+
 			//ゲームシーン
 			case SceneState::IN_GAME:
-				font30(U"BallCount {} / 5"_fmt(ballSpawner.GetBallCount())).drawAt(Vec2{ 100, 400 }, ColorF{ 0.2, 0.6, 0.9 });
 
 				// 更新
 				paddle.Update();
@@ -376,7 +473,6 @@ void Main()
 					paddle.Intersects(ball);
 				}
 
-
 				// 描画
 				bricks.Draw();
 				paddle.Draw();
@@ -384,12 +480,32 @@ void Main()
 					ballSpawner.GetBalls(i)->Draw();
 				}
 
-				//ボール生成
-				if (MouseR.down()) {
-					ballSpawner.Generate();
+				//Text表示
+				int brickCountDown = bricks.GetCurrentBrickCount() - ballSpawner.NextAddBallBrickCount();
+				if (brickCountDown > 0)
+				{
+					font30(U"ボール増えるまで あと {} 個"_fmt(brickCountDown))
+						.drawAt(Vec2{ Scene::Center().x, 550 }, ColorF{ 0.2, 0.6, 0.9 });
+				}
+				else if(bricks.GetCurrentBrickCount() != 0)
+				{
+					font30(U"頑張ってください").drawAt(Vec2{ Scene::Center().x, 550 }, ColorF{ 0.2, 0.6, 0.9 });
 				}
 
-				//ゲームオーバー判定
+				//ボール生成Trigger
+				if (!ballSpawner.IsCurrentBallMax() && bricks.GetCurrentBrickCount() == ballSpawner.NextAddBallBrickCount())
+				{
+					//ボール生成カウントダウンを始める
+					ballSpawner.BallSpawnPrepareToStart();
+				}
+				if (ballSpawner.GetIsBallSpawnPrepare())
+				{
+					//カウントダウン
+					ballSpawner.BallSpawnCountDown(Scene::DeltaTime());
+					font80(U"{:.0f}"_fmt(ballSpawner.GetBallSpawnCount())).drawAt(Scene::Center(), ColorF{ 0.2, 0.6, 0.9, 0.5 });
+				}
+
+				//弾が下に落ちたらTitleに戻る
 				for (int i = 0; i < ballSpawner.GetBallCount(); i++) {
 					Circle ball = ballSpawner.GetBalls(i)->GetCircle();
 					if (ball.y > 800)
@@ -400,6 +516,21 @@ void Main()
 						gameManager.SceneChange(SceneState::TITLE);
 					}
 				}
+
+				//ブロック数が０になったら
+				if (bricks.GetCurrentBrickCount() == 0)
+				{
+					font60(U"GameOver").drawAt(Scene::Center(), ColorF{ 0.2, 0.6, 0.9 });
+					font30(U"おめでとうございます").drawAt(Vec2{ Scene::Center().x, 550 }, ColorF{ 0.2, 0.6, 0.9 });
+					ballSpawner.Delete();
+					//Titleに戻るまで一定時間待つ
+					if (gameManager.WaitSceneChange(Scene::DeltaTime()))
+					{
+						//Titleに戻る
+						gameManager.SceneChange(SceneState::TITLE);
+					}
+				}
+
 				break;
 		}
 	}
