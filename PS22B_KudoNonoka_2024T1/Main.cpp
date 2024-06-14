@@ -32,7 +32,7 @@ namespace constants {
 		constexpr Size SIZE{ 40, 20 };
 
 		/// @brief ブロックの数　縦
-		constexpr int Y_COUNT = 1;
+		constexpr int Y_COUNT = 3;
 
 		/// @brief ブロックの数　横
 		constexpr int X_COUNT = 20;
@@ -520,7 +520,7 @@ void Main()
 				//ブロック数が０になったら
 				if (bricks.GetCurrentBrickCount() == 0)
 				{
-					font60(U"GameOver").drawAt(Scene::Center(), ColorF{ 0.2, 0.6, 0.9 });
+					font60(U"GameClear").drawAt(Scene::Center(), ColorF{ 0.2, 0.6, 0.9 });
 					font30(U"おめでとうございます").drawAt(Vec2{ Scene::Center().x, 550 }, ColorF{ 0.2, 0.6, 0.9 });
 					ballSpawner.Delete();
 					//Titleに戻るまで一定時間待つ
