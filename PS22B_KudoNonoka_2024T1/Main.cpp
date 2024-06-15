@@ -215,6 +215,57 @@ public:
 	}
 };
 
+class AudioProperty
+{
+public:
+	enum SE
+	{
+		BrickBreak,
+		Button,
+	};
+
+private:
+	SE se;
+	String filePath;
+
+public:
+	AudioProperty(SE seState, String path)
+	{
+		se = seState;
+		filePath = path;
+	}
+
+	String GetFilePath()
+	{
+		return filePath;
+	}
+};
+
+/// @brief 音再生用
+class AudioManager
+{
+private:
+	Audio audio;
+
+	/// @brief 音のデータ
+	AudioProperty sounds[2] =
+	{
+		AudioProperty(AudioProperty::SE::BrickBreak, U"example/shot.mp3"),
+		AudioProperty(AudioProperty::SE::Button, U"example/shot.mp3"),
+	};
+
+public:
+	/// @brief 音再生
+	/// @param se 再生する音
+	void SEPlay(AudioProperty::SE se)
+	{
+		int id = se;
+		String path = sounds[id].GetFilePath();
+		audio = Audio{ path };
+		audio.playOneShot();
+	}
+};
+
 /// @brief ブロック
 class Bricks final {
 private:
@@ -222,6 +273,8 @@ private:
 	Rect brickTable[constants::brick::MAX];
 	/// @brief 現在あるブロック数
 	int brickCount = constants::brick::MAX;
+
+	AudioManager audioManager;
 
 public:
 
@@ -353,6 +406,7 @@ public:
 	}
 };
 
+
 //==============================
 // 定義
 //==============================
@@ -390,6 +444,9 @@ void Bricks::Intersects(Ball* const target) {
 			//ブロックの数を減らす
 			brickCount--;
 
+			//音を出す
+			audioManager.SEPlay(AudioProperty::SE::BrickBreak);
+
 			// 同一フレームでは複数のブロック衝突を検知しない
 			break;
 		}
@@ -422,6 +479,7 @@ void Main()
 	Paddle paddle;
 	BallSpawner ballSpawner;
 	GameManager gameManager;
+	AudioManager audioManager;
 	//タイトルシーンにする
 	gameManager.SceneChange(SceneState::TITLE);
 
@@ -447,6 +505,9 @@ void Main()
 				//Startボタン表示
 				if (SimpleGUI::Button(U"START", Vec2{ Scene::Center().x - 50, Scene::Center().y + 80 }, 100))
 				{
+					//音を出す
+					audioManager.SEPlay(AudioProperty::SE::Button);
+
 					gameManager.SceneChange(SceneState::IN_GAME);
 					//ブロックの初期化
 					bricks.Instance();
